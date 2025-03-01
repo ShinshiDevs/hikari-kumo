@@ -7,6 +7,6 @@ import attrs
 __all__: Sequence[str] = ("Metadata",)
 
 
-@attrs.define(kw_only=True, slots=True, frozen=True)
+@attrs.define(kw_only=True, weakref_slot=False)
 class Metadata:
     name: str = attrs.field(repr=True, eq=True)

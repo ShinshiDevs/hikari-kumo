@@ -1,78 +1,82 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from collections.abc import Callable, Coroutine, Mapping, Sequence
+from collections.abc import Sequence
 from typing import Any, Generic, TypeVar
 
-from hikari.api import CommandBuilder
-from hikari.api.special_endpoints import SlashCommandBuilder
-
+from kumo.commands.exceptions import CommandNotFoundException
 from kumo.commands.metadata import CommandMetadata, SlashCommandMetadata, SubCommandMetadata
-from kumo.commands.traits import BuilderAware, CallbackAware
-from kumo.commands.types import NameTuple
-from kumo.context import CommandInteractionContext
-from kumo.traits import BotAware
+from kumo.commands.types import CommandCallbackT
+from kumo.commands.utils import get_callback
 
 __all__: Sequence[str] = ("Command", "SubCommand", "CommandGroup")
 
-T = TypeVar("T", bound=CommandBuilder)
-Container = TypeVar("Container", bound=Mapping[Any, SubCommand] | None)
-CommandCallbackT = Callable[..., Coroutine[Any, Any, None]]
+Item = TypeVar("Item")
 
 
-class Command(ABC, CallbackAware, BuilderAware[T], Generic[T]):
-    __slots__: Sequence[str] = ("_builder", "obj", "metadata")
+class Command:
+    __slots__: Sequence[str] = ("obj", "callback", "metadata")
 
     def __init__(self, obj: object, metadata: CommandMetadata) -> None:
-        self._builder: T | None = None
         self.obj: object = obj
+        self.callback: CommandCallbackT = get_callback(obj)
         self.metadata: CommandMetadata = metadata
 
 
-class Group(ABC, Generic[Container]):
+class SubCommand:  # noqa: B903
+    __slots__: Sequence[str] = ("group", "callback", "metadata")
+
+    def __init__(
+        self, callback: CommandCallbackT, metadata: SubCommandMetadata, *, group: SubCommandGroup | None = None
+    ) -> None:
+        self.group: SubCommandGroup | None = group
+        self.callback: CommandCallbackT = callback
+        self.metadata: SubCommandMetadata = metadata
+
+
+class Group(ABC, Generic[Item]):
     __slots__: Sequence[str] = ("parent", "metadata", "commands")
 
     def __init__(self, metadata: SlashCommandMetadata | SubCommandMetadata, parent: Group[Any] | None = None) -> None:
         self.parent: Group[Any] | None = parent
         self.metadata: SlashCommandMetadata | SubCommandMetadata = metadata
 
-        if self.parent is None:
-            self.commands: Container = {}  # TODO: fix, if possible, or # type: ignore
+        self.commands: dict[Any, Item] = {}  # type: ignore
 
     @abstractmethod
-    def add_command(self, command: SubCommand) -> None:
+    def add_command(self, command: Item) -> None:
+        raise NotImplementedError
+
+    @abstractmethod
+    def get_command(self, name: str) -> Item:
         raise NotImplementedError
 
 
-class SubCommand:
-    __slots__: Sequence[str] = ("parent", "callback", "metadata")
-
-    def __init__(
-        self, callback: CommandCallbackT, metadata: SubCommandMetadata, *, parent: SubCommandGroup | None = None
-    ) -> None:
-        self.parent: SubCommandGroup | None = parent
-        self.callback: CommandCallbackT = callback
-        self.metadata: SubCommandMetadata = metadata
-
-
-class SubCommandGroup(Group[None]):
+class SubCommandGroup(Group[SubCommand]):
     def __init__(self, parent: CommandGroup, metadata: SubCommandMetadata) -> None:
         super().__init__(metadata, parent)
 
     def add_command(self, command: SubCommand) -> None:
-        assert self.parent
-        return self.parent.add_command(command)
+        self.commands[command.metadata.name] = command
+
+    def get_command(self, name: str) -> SubCommand:
+        return self.commands[name]
 
 
-class CommandGroup(Group[dict[NameTuple, SubCommand]], BuilderAware[SlashCommandBuilder]):
+class CommandGroup(Group[SubCommand | SubCommandGroup]):
     def __init__(self, obj: object, metadata: SlashCommandMetadata) -> None:
         super().__init__(metadata)
 
-    def add_command(self, command: SubCommand) -> None:
-        self.commands[
-            (command.parent.metadata.name, command.metadata.name) if command.parent else (command.metadata.name,)
-        ] = command
+    def add_command(self, command: SubCommand | SubCommandGroup) -> None:
+        self.commands[command.metadata.name] = command
 
-    def builder(self, bot: BotAware) -> SlashCommandBuilder: ...
-
-    async def callback(self, context: CommandInteractionContext) -> None: ...
+    def get_command(self, name: str, *, group: str | None = None) -> SubCommand:
+        command_group: CommandGroup | SubCommandGroup = self
+        if group and (sub_group := self.commands.get(group)):
+            assert isinstance(sub_group, SubCommandGroup)
+            command_group = sub_group
+        else:
+            raise CommandNotFoundException(f"Cannot get sub command group {group} in {self.metadata.name}")
+        if command := command_group.commands.get(name):
+            return command
+        raise CommandNotFoundException(f"Cannot get {self.metadata.name} {group} {name}")
