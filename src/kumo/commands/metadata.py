@@ -7,7 +7,7 @@ from hikari.permissions import Permissions
 from hikari.undefined import UNDEFINED, UndefinedOr
 
 from kumo.commands.options import Option
-from kumo.i18n.types import LocalizedOr
+from kumo.i18n.types import Localized, LocalizedOr
 from kumo.metadata import Metadata
 
 __all__: Sequence[str] = (
@@ -22,7 +22,7 @@ __all__: Sequence[str] = (
 
 @attrs.define(kw_only=True, weakref_slot=False, slots=False)
 class CommandMetadata(Metadata):
-    display_name: LocalizedOr[str] = attrs.field(repr=False, eq=False)
+    display_name: Localized | None = attrs.field(default=None, repr=False, eq=False)
 
 
 @attrs.define(kw_only=True, weakref_slot=False, slots=False)
@@ -34,9 +34,9 @@ class ApplicationMetadata(CommandMetadata):
 
 @attrs.define(kw_only=True, weakref_slot=False, slots=False)
 class SubCommandMetadata(CommandMetadata):
-    description: LocalizedOr[str] = attrs.field(repr=False, eq=False)
+    description: LocalizedOr[str] | None = attrs.field(default=None, repr=False, eq=False)
 
-    options: Sequence[Option] = attrs.field(factory=tuple, repr=False, eq=False)
+    options: Sequence[Option] | None = attrs.field(default=None, repr=False, eq=False)
 
 
 @attrs.define(kw_only=True, weakref_slot=False, slots=False)

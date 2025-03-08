@@ -1,19 +1,26 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping, Sequence
-from concurrent.futures import Executor
-from os import PathLike
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from hikari.events import InteractionCreateEvent
-from hikari.guilds import PartialGuild
-from hikari.impl import CacheSettings, HTTPSettings, ProxySettings, gateway_bot
-from hikari.intents import Intents
-from hikari.interactions.base_interactions import InteractionType
+from hikari.impl import gateway_bot
+from hikari.interactions import InteractionType
 from hikari.internal import data_binding
-from hikari.snowflakes import SnowflakeishOr
 
 from kumo.impl.command_handler import CommandHandler
+
+if TYPE_CHECKING:
+    from concurrent.futures import Executor
+    from os import PathLike
+
+    from hikari.guilds import PartialGuild
+    from hikari.impl import CacheSettings, HTTPSettings, ProxySettings
+    from hikari.intents import Intents
+    from hikari.snowflakes import SnowflakeishOr
+
+    from kumo.commands.types import CommandT
+    from kumo.i18n.abc.ilocalization_provider import ILocalizationProvider
 
 __all__: Sequence[str] = ()
 
@@ -23,6 +30,7 @@ class GatewayBot(gateway_bot.GatewayBot):
         self,
         token: str,
         *,
+        i18n: ILocalizationProvider | None = None,
         allow_color: bool = True,
         banner: str | None = "hikari",
         suppress_optimization_warning: bool = False,
@@ -63,9 +71,17 @@ class GatewayBot(gateway_bot.GatewayBot):
             proxy_settings=proxy_settings,
             rest_url=rest_url,
         )
-        self.commands: CommandHandler = CommandHandler(self, None)
+        self.commands: CommandHandler = CommandHandler(self, i18n=i18n)
         self.event_manager.subscribe(InteractionCreateEvent, self.on_interaction)
 
     async def on_interaction(self, event: InteractionCreateEvent) -> None:
         if event.interaction.type is InteractionType.APPLICATION_COMMAND:
             await self.commands.dispatch(event)
+
+    def init_command(self, command: CommandT) -> CommandT:
+        command.obj = command.obj()
+        return command
+
+    def add_command(self, command: CommandT) -> None:
+        command = self.init_command(command)
+        self.commands.add_command(command)

@@ -4,23 +4,25 @@ from collections.abc import Sequence
 from typing import Generic, TypeVar
 
 import attrs
-from hikari.interactions.base_interactions import PartialInteraction
+from hikari.events import Event
+from hikari.interactions import PartialInteraction
 from hikari.traits import RESTAware
 
-from kumo.events.base_events import Event, ExceptionEvent
+from kumo.context import InteractionContext
+from kumo.events.base_events import ExceptionEvent
 
 __all__: Sequence[str] = ("InteractionEvent", "InteractionExceptionEvent")
 
-T = TypeVar("T", bound=PartialInteraction)
+T = TypeVar("T", bound=InteractionContext[PartialInteraction])
 
 
 @attrs.define(kw_only=True, weakref_slot=False, slots=False)
 class InteractionEvent(Event, Generic[T]):
-    interaction: T = attrs.field()
+    context: T = attrs.field()
 
     @property
     def app(self) -> RESTAware:
-        return self.interaction.app
+        return self.context.interaction.app
 
 
 @attrs.define(kw_only=True, weakref_slot=False, slots=False)

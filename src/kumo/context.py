@@ -1,21 +1,25 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Any, Generic, TypeVar
+from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
 import attrs
-from hikari.api import ComponentBuilder
-from hikari.channels import TextableGuildChannel
-from hikari.embeds import Embed
-from hikari.files import Resourceish
-from hikari.guilds import GatewayGuild, PartialRole
-from hikari.interactions import CommandInteraction, InteractionMember, PartialInteraction, ResponseType
+from hikari.interactions import ResponseType
 from hikari.messages import Message, MessageFlag
-from hikari.snowflakes import SnowflakeishSequence
-from hikari.undefined import UNDEFINED, UndefinedOr
-from hikari.users import PartialUser, User
 
-from kumo.traits import BotAware
+if TYPE_CHECKING:
+    from hikari.api import ComponentBuilder
+    from hikari.channels import TextableGuildChannel
+    from hikari.embeds import Embed
+    from hikari.files import Resourceish
+    from hikari.guilds import GatewayGuild, PartialRole
+    from hikari.interactions import CommandInteraction, InteractionMember, PartialInteraction
+    from hikari.snowflakes import SnowflakeishSequence
+    from hikari.traits import GatewayBotAware
+    from hikari.undefined import UNDEFINED, UndefinedOr
+    from hikari.users import PartialUser, User
+
+    from kumo.i18n.abc.ilocalization_provider import ILocalizationProvider
 
 __all__: Sequence[str] = ("CommandInteractionContext",)
 
@@ -24,8 +28,10 @@ T = TypeVar("T", bound=PartialInteraction)
 
 @attrs.define(kw_only=True, weakref_slot=False)
 class InteractionContext(Generic[T]):
-    bot: BotAware
-    interaction: T
+    bot: GatewayBotAware = attrs.field(repr=False, eq=False)
+    interaction: T = attrs.field(repr=True, eq=True)
+
+    i18n: ILocalizationProvider | None = attrs.field(default=None, repr=False, eq=False)
 
     async def defer(self, flags: MessageFlag = MessageFlag.NONE, *, ephemeral: bool = False) -> None:
         if ephemeral:

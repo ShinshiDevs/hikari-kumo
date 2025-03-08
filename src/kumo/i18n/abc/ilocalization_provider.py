@@ -5,7 +5,7 @@ from typing import Protocol
 
 from hikari.locales import Locale
 
-from kumo.i18n.localized import Localized
+from kumo.i18n.types import Localized
 
 __all__: Sequence[str] = ("ILocalizationProvider",)
 
@@ -13,4 +13,4 @@ __all__: Sequence[str] = ("ILocalizationProvider",)
 class ILocalizationProvider(Protocol):
     __slots__: Sequence[str] = ()
 
-    def localize(self, value: Localized) -> tuple[Mapping[Locale, str], str]: ...
+    def localize(self, value: Localized) -> tuple[Mapping[Locale | str, str], str]: ...
